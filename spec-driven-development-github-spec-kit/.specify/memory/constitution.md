@@ -14,13 +14,20 @@ Sync Impact Report:
 ## Technology Standards
 
 - All cloud resources must be hosted on Docker.
-- Back-end services use Java 25 and Spring Boot.
+- Back-end services use Java 25 and Spring Boot 4.0.1.
 - Front-end applications use Angular.
 - Database: MongoDB.
 - Secret management exclusively via Docker.
 - Document storage must use MongoDB GridFS for all file content exceeding 16MB, with metadata stored in standard MongoDB collections.
 - All infrastructure required for local development (Keycloak, MongoDB, supporting services) must run in Docker on WSL 2. Docker Desktop is not permitted.
 - All applications (back-end, front-end, services, gateways, schedulers) must be containerized for all environments, including development, testing, staging, and production.
+- All technologies used in the system must rely on the latest stable versions available at generation time. 
+- Back-end applications must use the latest LTS or stable release of Java and Spring Boot.
+- Keycloak instances must use the latest stable server image published upstream.
+- MongoDB must use the latest stable community server version for all environments.
+- All containerized services must be built from the latest stable Docker images, unless explicitly overridden for compliance reasons.
+- SDD-generated code and infrastructure must automatically target the latest compatible versions of all required runtimes, frameworks, and libraries.
+
 
 ## Security Requirements
 

@@ -1,0 +1,846 @@
+openapi: 3.0.3
+info:
+  title: Employee Portal API
+  version: 1.0.0
+  description: REST API for Employee Portal document management and user services
+  contact:
+    name: Employee Portal Team
+    email: support@employee-portal.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8081/api
+    description: Local development server
+  - url: https://api.employee-portal.com/v1
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      summary: User login
+      description: Authenticate user and return JWT token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: "john.doe"
+                password:
+                  type: string
+                  format: password
+                  example: "password123"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  token_type:
+                    type: string
+                    example: "Bearer"
+                  expires_in:
+                    type: integer
+                    example: 3600
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      description: Refresh expired JWT token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                  expires_in:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /users/profile:
+    get:
+      summary: Get user profile
+      description: Retrieve current user's profile information
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      summary: Update user profile
+      description: Update current user's profile information
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                  example: "John"
+                lastName:
+                  type: string
+                  example: "Doe"
+                email:
+                  type: string
+                  format: email
+                  example: "john.doe@company.com"
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /documents:
+    get:
+      summary: List user documents
+      description: Retrieve paginated list of user's documents
+      tags:
+        - Documents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Page number (0-based)
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of items per page
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [uploadedAt, filename, size]
+            default: uploadedAt
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+        - name: filename
+          in: query
+          schema:
+            type: string
+          description: Filter by filename (partial match)
+        - name: contentType
+          in: query
+          schema:
+            type: string
+          description: Filter by MIME type
+      responses:
+        '200':
+          description: Documents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+                  page:
+                    type: object
+                    properties:
+                      number:
+                        type: integer
+                      size:
+                        type: integer
+                      totalElements:
+                        type: integer
+                      totalPages:
+                        type: integer
+                  _links:
+                    $ref: '#/components/schemas/HATEOASLinks'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      summary: Upload document
+      description: Upload a new document to the portal
+      tags:
+        - Documents
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Document file to upload
+                description:
+                  type: string
+                  description: Optional document description
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: Optional tags for categorization
+      responses:
+        '201':
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+              description: URI of the created document
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/Error'
+
+  /documents/{documentId}:
+    get:
+      summary: Get document metadata
+      description: Retrieve document metadata by ID
+      tags:
+        - Documents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document unique identifier
+      responses:
+        '200':
+          description: Document metadata retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      summary: Update document metadata
+      description: Update document description and tags
+      tags:
+        - Documents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document unique identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Document updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      summary: Delete document
+      description: Delete a document and its file content
+      tags:
+        - Documents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document unique identifier
+      responses:
+        '204':
+          description: Document deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /documents/{documentId}/download:
+    get:
+      summary: Download document
+      description: Download the actual document file
+      tags:
+        - Documents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document unique identifier
+      responses:
+        '200':
+          description: Document file download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Filename for download
+            Content-Type:
+              schema:
+                type: string
+              description: MIME type of the file
+            Content-Length:
+              schema:
+                type: integer
+              description: File size in bytes
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /admin/users:
+    get:
+      summary: List all users (Admin only)
+      description: Retrieve paginated list of all users in the system
+      tags:
+        - Administration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: enabled
+          in: query
+          schema:
+            type: boolean
+          description: Filter by enabled status
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  page:
+                    type: object
+                    properties:
+                      number:
+                        type: integer
+                      size:
+                        type: integer
+                      totalElements:
+                        type: integer
+                      totalPages:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /admin/audit-logs:
+    get:
+      summary: Get audit logs (Admin only)
+      description: Retrieve system audit logs
+      tags:
+        - Administration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [CREATE, READ, UPDATE, DELETE, UPLOAD, DOWNLOAD]
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+            enum: [USER, DOCUMENT]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Audit logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+                  page:
+                    type: object
+                    properties:
+                      number:
+                        type: integer
+                      size:
+                        type: integer
+                      totalElements:
+                        type: integer
+                      totalPages:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        username:
+          type: string
+          example: "john.doe"
+        email:
+          type: string
+          format: email
+          example: "john.doe@company.com"
+        firstName:
+          type: string
+          example: "John"
+        lastName:
+          type: string
+          example: "Doe"
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [USER, ADMIN, MANAGER]
+          example: ["USER"]
+        enabled:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-22T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-01-22T10:30:00Z"
+        lastLoginAt:
+          type: string
+          format: date-time
+          example: "2026-01-22T14:25:00Z"
+      required:
+        - id
+        - username
+        - email
+        - roles
+        - enabled
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440001"
+        userId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        originalFilename:
+          type: string
+          example: "employee-handbook.pdf"
+        contentType:
+          type: string
+          example: "application/pdf"
+        size:
+          type: integer
+          format: int64
+          example: 2048576
+        logicalPath:
+          type: string
+          example: "/users/550e8400-e29b-41d4-a716-446655440000/documents/"
+        storagePath:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000/550e8400-e29b-41d4-a716-446655440001/employee-handbook.pdf"
+        uploadedAt:
+          type: string
+          format: date-time
+          example: "2026-01-22T10:30:00Z"
+        checksum:
+          type: string
+          example: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+        metadata:
+          type: object
+          properties:
+            tags:
+              type: array
+              items:
+                type: string
+              example: ["hr", "handbook"]
+            description:
+              type: string
+              example: "Company employee handbook"
+            version:
+              type: integer
+              example: 1
+        accessControl:
+          type: object
+          properties:
+            ownerId:
+              type: string
+              format: uuid
+            sharedWith:
+              type: array
+              items:
+                type: string
+                format: uuid
+            public:
+              type: boolean
+              default: false
+      required:
+        - id
+        - userId
+        - originalFilename
+        - contentType
+        - size
+        - uploadedAt
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-22T10:30:00Z"
+        action:
+          type: string
+          enum: [CREATE, READ, UPDATE, DELETE, UPLOAD, DOWNLOAD]
+          example: "UPLOAD"
+        resourceType:
+          type: string
+          enum: [USER, DOCUMENT]
+          example: "DOCUMENT"
+        resourceId:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440001"
+        userId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        ipAddress:
+          type: string
+          example: "192.168.1.100"
+        userAgent:
+          type: string
+          example: "Mozilla/5.0..."
+        details:
+          type: object
+          properties:
+            fileSize:
+              type: integer
+              format: int64
+            contentType:
+              type: string
+            success:
+              type: boolean
+            errorMessage:
+              type: string
+        correlationId:
+          type: string
+          example: "abc-123-def-456"
+      required:
+        - timestamp
+        - action
+        - resourceType
+        - userId
+
+    HATEOASLinks:
+      type: object
+      properties:
+        self:
+          type: object
+          properties:
+            href:
+              type: string
+              format: uri
+        first:
+          type: object
+          properties:
+            href:
+              type: string
+              format: uri
+        prev:
+          type: object
+          properties:
+            href:
+              type: string
+              format: uri
+        next:
+          type: object
+          properties:
+            href:
+              type: string
+              format: uri
+        last:
+          type: object
+          properties:
+            href:
+              type: string
+              format: uri
+
+    Error:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+        correlationId:
+          type: string
+      required:
+        - timestamp
+        - status
+        - error
+        - message
+
+  responses:
+    BadRequestError:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            timestamp: "2026-01-22T10:30:00Z"
+            status: 400
+            error: "Bad Request"
+            message: "Validation failed"
+            path: "/api/documents"
+            correlationId: "abc-123-def-456"
+
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            timestamp: "2026-01-22T10:30:00Z"
+            status: 401
+            error: "Unauthorized"
+            message: "Invalid or missing authentication token"
+            path: "/api/documents"
+            correlationId: "abc-123-def-456"
+
+    ForbiddenError:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            timestamp: "2026-01-22T10:30:00Z"
+            status: 403
+            error: "Forbidden"
+            message: "Insufficient permissions"
+            path: "/api/documents/123"
+            correlationId: "abc-123-def-456"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            timestamp: "2026-01-22T10:30:00Z"
+            status: 404
+            error: "Not Found"
+            message: "Document not found"
+            path: "/api/documents/123"
+            correlationId: "abc-123-def-456"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from Keycloak authentication</content>
+<parameter name="filePath">c:\Users\jomichel\git\AI-Driven-Software-Development\spec-driven-development-github-spec-kit\specs\001-employee-portal\contracts\api-spec.yaml
