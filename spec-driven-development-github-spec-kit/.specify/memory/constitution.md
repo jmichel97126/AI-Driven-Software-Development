@@ -19,7 +19,7 @@ Sync Impact Report:
 - Database: MongoDB.
 - Secret management exclusively via Docker.
 - Document storage must use MongoDB GridFS for all file content exceeding 16MB, with metadata stored in standard MongoDB collections.
-- All infrastructure required for local development (Keycloak, MongoDB, supporting services) must run in Docker on WSL 2.
+- All infrastructure required for local development (Keycloak, MongoDB, supporting services) must run in Docker on WSL 2. Docker Desktop is not permitted.
 - All applications (back-end, front-end, services, gateways, schedulers) must be containerized for all environments, including development, testing, staging, and production.
 
 ## Security Requirements
@@ -120,6 +120,16 @@ Sync Impact Report:
 - Infrastructure services required for application execution (Keycloak, MongoDB, message brokers, caches, etc.) must also run in containers.
 - Container images must be stored in a secure private registry.
 - Images must follow semantic versioning and include git commit signatures for traceability.
+
+
+## Host & Runtime Environment Standards
+
+- Docker must run inside Ubuntu on WSL2. Docker Desktop is not allowed or supported.
+- All container-based services (Keycloak, MongoDB, supporting infrastructure) must be executed using the Docker engine inside the WSL2 environment.
+- All SDD-generated scripts (setup scripts, environment initialization, docker-compose files) must target the Docker daemon available inside WSL2.
+- Developers must execute container commands (docker, docker compose) from within the Ubuntu WSL2 terminal.
+- No containers, images, or networks may be managed from Windows host-level tooling.
+- All local development infrastructure must be platform-independent and rely solely on Docker in WSL2.
 
 ---
 
